@@ -1,6 +1,6 @@
 Python script that parses postfix maillog and stores it into MySQL/MariaDB table.
 
-# Manual MySQL Table creation :
+### Manual MySQL Table creation :
 
 CREATE TABLE IF NOT EXISTS `log` ( 
     `id` INT NOT NULL AUTO_INCREMENT,

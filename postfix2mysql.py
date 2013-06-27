@@ -3,24 +3,35 @@
 
 import re;
 import MySQLdb;
+import sys;
+import os;
 
-db_host = 'localhost';
-db_user = 'root';
-db_pass = 'toor';
-db_name = 'maillog'
-logfile = 'maillog_';
+db = {
+    'host' : 'localhost',
+    'user' : 'root',
+    'passwd' : 'toor',
+    'name' : 'maillog'
+};
+
+ignore = ['viruscontrol@trade.su'];
+
+if len(sys.argv) > 1:
+    logfile = sys.argv[1];
+else:
+    logfile = "maillog"
 
 email = re.compile('<[a-zA-Z0-9@.-_]+>');
 badwords = ['warning:','disconnect'];
 
+
 class Record:
-    '''Structure for an event with uniq id'''
+    '''Structure to store an event with uniq id'''
     _from = '' ;
     _to = '';
     _time = '';
 
 def insertRecord(db, record):
-    sql = '''INSERT INTO `log` (`time`, `from`, `to`) VALUES ('%(time)s', '%(from)s', '%(to)s');'''%{'time':record._time, 'from':record._from, 'to':record._to};
+    sql = '''INSERT INTO `log` (`time`, `from`, `to`) VALUES ('%(time)s', '%(from)s', '%(to)s');'''%{'time':record._time, 'from':record._from, 'to':record._to.strip()};
     print sql;
     db.query(sql);
     db.commit();
@@ -30,26 +41,33 @@ def createTable(db):
     db.query(sql);
     db.commit();
 
-db = MySQLdb.connect(host=db_host, user=db_user, passwd=db_pass, db=db_name, charset='utf8');
-createTable(db);
+try:
+    db = MySQLdb.connect(host=db['host'], user=db['user'], passwd=db['passwd'], db=db['name'], charset='utf8');
+    createTable(db);
+except Exception, e:
+    print 'Database connection error: '+repr(e);
+    sys.exit();
 
 records = {};
-maillog = open(logfile,'r');
-for line in maillog:
-    (mailer, msgid, event) = line.split()[4:7];
-    if mailer.startswith('postfix') and not (msgid in badwords):
-        if not records.has_key(msgid):
-                records[msgid] = Record();
-                records[msgid]._time = " ".join(line.split()[0:3]);
-        if event.startswith('from'):
-                match = email.search(event);
-                if (match):
-                    records[msgid]._from = email.search(event).group(); 
-        if event.startswith('to'):
-                match = email.search(event);
-                if (match):
-                    records[msgid]._from = email.search(event).group(); 
-        if event.startswith('removed'):
-            insertRecord(db, records[msgid]);
-            del (records[msgid]);
-maillog.close();
+if os.path.isfile(logfile):
+    maillog = open(logfile,'r');
+    for line in maillog:
+        (mailer, msgid, event) = line.split()[4:7];
+        if mailer.startswith('postfix') and msgid not in badwords:
+            if not records.has_key(msgid):
+                    records[msgid] = Record();
+                    records[msgid]._time = " ".join(line.split()[0:3]);
+            if event.startswith('from'):
+                    match = email.search(event);
+                    if match and match not in ignore:
+                        records[msgid]._from = email.search(event).group().replace('<','').replace('>',''); 
+            if event.startswith('to'):
+                    match = email.search(event);
+                    if match and match not in ignore:
+                        records[msgid]._to += email.search(event).group().replace('<','').replace('>','')+" "; 
+            if event.startswith('removed'):
+                insertRecord(db, records[msgid]);
+                del (records[msgid]);
+    maillog.close();
+else:
+    print logfile+" : file not found."

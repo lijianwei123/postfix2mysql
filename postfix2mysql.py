@@ -50,24 +50,23 @@ except Exception, e:
 
 records = {};
 if os.path.isfile(logfile):
-    maillog = open(logfile,'r');
-    for line in maillog:
-        (mailer, msgid, event) = line.split()[4:7];
-        if mailer.startswith('postfix') and msgid not in badwords:
-            if not records.has_key(msgid):
-                    records[msgid] = Record();
-                    records[msgid]._time = " ".join(line.split()[0:3]);
-            if event.startswith('from'):
-                    match = email.search(event);
-                    if match and match not in ignore:
-                        records[msgid]._from = email.search(event).group().replace('<','').replace('>',''); 
-            if event.startswith('to'):
-                    match = email.search(event);
-                    if match and match not in ignore:
-                        records[msgid]._to += email.search(event).group().replace('<','').replace('>','')+" "; 
-            if event.startswith('removed'):
-                insertRecord(db, records[msgid]);
-                del (records[msgid]);
-    maillog.close();
+    with open(logfile,'r') as maillog: 
+        for line in maillog:
+            (mailer, msgid, event) = line.split()[4:7];
+            if mailer.startswith('postfix') and msgid not in badwords:
+                if not records.has_key(msgid):
+                        records[msgid] = Record();
+                        records[msgid]._time = " ".join(line.split()[0:3]);
+                if event.startswith('from'):
+                        match = email.search(event);
+                        if match and match not in ignore:
+                            records[msgid]._from = email.search(event).group().strip('><');
+                if event.startswith('to'):
+                        match = email.search(event);
+                        if match and match not in ignore:
+                            records[msgid]._to += email.search(event).group().strip('><')+" "; 
+                if event.startswith('removed'):
+                    insertRecord(db, records[msgid]);
+                    del (records[msgid]);
 else:
-    print logfile+" : file not found."
+    print logfile+" : file not found"
